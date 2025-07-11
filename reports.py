@@ -10,7 +10,7 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, Tabl
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 from utils import generate_domain_summary, format_time_display
 
-def generate_pdf_report(df, stats, start_date, end_date):
+def generate_pdf_report(df, stats, start_date, end_date, include_predictions=True, include_alerts=True):
     """
     Génère un rapport PDF complet des statistiques de pointage
     """
@@ -159,6 +159,73 @@ def generate_pdf_report(df, stats, start_date, end_date):
     
     elements.append(Spacer(1, 20))
     
+    # Système d'alertes
+    if include_alerts:
+        elements.append(Paragraph("SYSTÈME D'ALERTES", heading_style))
+        
+        try:
+            from alerts import AlertSystem
+            alert_system = AlertSystem()
+            alerts = alert_system.get_all_alerts(30)
+            
+            if alerts:
+                elements.append(Paragraph("🚨 Alertes Détectées:", normal_style))
+                
+                # Alertes d'absence
+                absence_alerts = [a for a in alerts if a['type'] == 'absence']
+                if absence_alerts:
+                    elements.append(Paragraph(f"Employés avec absences excessives (>{len(absence_alerts)}):", normal_style))
+                    for alert in absence_alerts[:5]:  # Top 5
+                        alert_text = f"• {alert['matricule']} ({alert['domaine']}): {alert['count']} absences"
+                        elements.append(Paragraph(alert_text, normal_style))
+                
+                # Alertes de retard
+                late_alerts = [a for a in alerts if a['type'] == 'retard']
+                if late_alerts:
+                    elements.append(Paragraph(f"Employés avec retards fréquents (≥3):", normal_style))
+                    for alert in late_alerts[:5]:  # Top 5
+                        alert_text = f"• {alert['matricule']} ({alert['domaine']}): {alert['count']} retards"
+                        elements.append(Paragraph(alert_text, normal_style))
+            else:
+                elements.append(Paragraph("✅ Aucune alerte détectée pour cette période.", normal_style))
+                
+        except Exception:
+            elements.append(Paragraph("Système d'alertes non disponible.", normal_style))
+        
+        elements.append(Spacer(1, 20))
+    
+    # Prédictions comportementales
+    if include_predictions:
+        elements.append(Paragraph("PRÉDICTIONS COMPORTEMENTALES", heading_style))
+        
+        try:
+            from prediction import AttendancePrediction
+            prediction_system = AttendancePrediction()
+            
+            # Analyse des risques pour quelques employés
+            employees_sample = df['matricule'].unique()[:5] if not df.empty else []
+            risk_employees = []
+            
+            for emp in employees_sample:
+                risk_analysis = prediction_system.get_risk_analysis(emp)
+                if risk_analysis and risk_analysis.get('risk_level') in ['Élevé', 'Modéré']:
+                    risk_employees.append(risk_analysis)
+            
+            if risk_employees:
+                elements.append(Paragraph("⚠️ Employés à Risque Identifiés:", normal_style))
+                for risk in risk_employees:
+                    risk_text = f"• {risk['matricule']} ({risk['domaine']}): Risque {risk['risk_level']}"
+                    if risk['risk_factors']:
+                        risk_text += f" - {', '.join(risk['risk_factors'][:2])}"
+                    elements.append(Paragraph(risk_text, normal_style))
+            else:
+                elements.append(Paragraph("✅ Aucun employé à risque élevé détecté.", normal_style))
+                
+        except Exception:
+            elements.append(Paragraph("Système de prédiction non disponible.", normal_style))
+        
+        elements.append(Spacer(1, 20))
+    
     # Recommandations
     elements.append(Paragraph("RECOMMANDATIONS", heading_style))
     
@@ -167,7 +234,9 @@ def generate_pdf_report(df, stats, start_date, end_date):
         "• Organiser des sessions de sensibilisation pour les domaines avec faible taux de présence",
         "• Mettre en place des mesures incitatives pour réduire les retards",
         "• Analyser les causes d'absence récurrentes par domaine",
-        "• Considérer l'ajustement des horaires de travail si nécessaire"
+        "• Considérer l'ajustement des horaires de travail si nécessaire",
+        "• Suivre de près les employés identifiés dans les alertes",
+        "• Utiliser les prédictions pour anticiper les problèmes comportementaux"
     ]
     
     for recommendation in recommendations:

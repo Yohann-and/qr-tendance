@@ -57,6 +57,16 @@ class AuthManager:
         """Interface de connexion"""
         st.title("🔐 Connexion - Dashboard QR Pointage")
         
+        # Affichage de l'image de connexion
+        try:
+            col1, col2, col3 = st.columns([1, 2, 1])
+            with col2:
+                st.image("logo.jpeg", width=300, caption="Dashboard QR Pointage")
+        except:
+            pass  # Si l'image n'est pas trouvée, on continue sans
+        
+        st.markdown("---")
+        
         with st.form("login_form"):
             st.markdown("### Veuillez vous connecter pour accéder au dashboard")
             
