@@ -24,6 +24,8 @@ Preferred communication style: Simple, everyday language.
 - **Enhanced Reports**: Integrated predictions and alerts data into PDF reports with improved recommendations
 - **Production Ready**: Removed test data functionality, application now connects to real PostgreSQL database
 - **UI Improvements**: Added company logo to login portal, improved navigation with quick access to QR app
+- **Enhanced Chatbot**: Enriched with categorized questions, advanced AI capabilities for alerts, predictions, comparisons, trends, and performance analysis
+- **Render Deployment**: Prepared complete deployment package for Render.com with configuration files, scripts, and documentation
 
 ## System Architecture
 
