@@ -361,18 +361,54 @@ def show_chatbot(chatbot):
     if 'chat_history' not in st.session_state:
         st.session_state.chat_history = []
     
-    # Questions suggérées
-    st.markdown("### Questions suggérées:")
-    suggested_questions = chatbot.get_suggested_questions()
+    # Questions suggérées par catégorie
+    st.markdown("### 💡 Questions suggérées par catégorie:")
     
-    col1, col2 = st.columns(2)
-    for i, question in enumerate(suggested_questions):
-        with col1 if i % 2 == 0 else col2:
-            if st.button(f"💬 {question}", key=f"suggested_{i}"):
-                st.session_state.chat_history.append({"type": "user", "message": question})
-                response = chatbot.process_question(question)
-                st.session_state.chat_history.append({"type": "bot", "message": response})
-                st.rerun()
+    # Catégories de questions
+    question_categories = {
+        "📊 Statistiques de base": [
+            "Combien de retards chez les chantres aujourd'hui?",
+            "Quel est le taux de présence du domaine Protocole cette semaine?",
+            "Combien d'absences au total ce mois?",
+            "Statistiques générales aujourd'hui"
+        ],
+        "🚨 Alertes et surveillance": [
+            "Quelles sont les alertes actives?",
+            "Y a-t-il des employés problématiques?",
+            "Quels employés nécessitent une attention?",
+            "Montre-moi les employés avec le plus d'absences"
+        ],
+        "🔮 Prédictions et tendances": [
+            "Montre-moi les prédictions comportementales",
+            "Quelle est la tendance de présence ce mois?",
+            "Évolution de la présence sur 30 jours",
+            "Quels employés risquent d'être absents?"
+        ],
+        "🏆 Performances et classements": [
+            "Quel domaine a la meilleure performance?",
+            "Quels sont les employés les plus assidus?",
+            "Analyse les performances par domaine",
+            "Compare cette semaine à la semaine dernière"
+        ],
+        "🔍 Analyses avancées": [
+            "Compare les domaines entre eux",
+            "Analyse des horaires de pointage",
+            "Recommandations pour améliorer l'assiduité",
+            "Aide - que peux-tu faire?"
+        ]
+    }
+    
+    # Affichage des catégories dans des expandeurs
+    for category, questions in question_categories.items():
+        with st.expander(category):
+            col1, col2 = st.columns(2)
+            for i, question in enumerate(questions):
+                with col1 if i % 2 == 0 else col2:
+                    if st.button(f"💬 {question}", key=f"cat_{category}_{i}"):
+                        st.session_state.chat_history.append({"type": "user", "message": question})
+                        response = chatbot.process_question(question)
+                        st.session_state.chat_history.append({"type": "bot", "message": response})
+                        st.rerun()
     
     # Zone de chat
     st.markdown("### Conversation")
