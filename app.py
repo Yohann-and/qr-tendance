@@ -12,6 +12,7 @@ from auth import AuthManager
 from chatbot import AttendanceChatbot
 from prediction import AttendancePrediction
 from alerts import AlertSystem
+from sample_data import SampleDataGenerator
 
 # Configuration de la page
 st.set_page_config(
@@ -60,7 +61,7 @@ def main():
     st.markdown("---")
     
     # Navigation principale
-    tab1, tab2, tab3, tab4, tab5 = st.tabs(["📈 Tableau de Bord", "🤖 Chatbot", "🔮 Prédictions", "🚨 Alertes", "⚙️ Paramètres"])
+    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["📈 Tableau de Bord", "🤖 Chatbot", "🔮 Prédictions", "🚨 Alertes", "⚙️ Paramètres", "🎯 Données Test"])
     
     with tab1:
         show_dashboard()
@@ -79,6 +80,9 @@ def main():
             show_settings()
         else:
             st.error("Accès refusé. Droits administrateur requis.")
+    
+    with tab6:
+        show_sample_data()
 
 def show_dashboard():
     """Affiche le tableau de bord principal"""
@@ -558,6 +562,127 @@ def show_settings():
     with st.expander("📈 Statistiques Système"):
         st.markdown("**Utilisation de l'application:**")
         st.info("Statistiques d'utilisation à venir...")
+
+def show_sample_data():
+    """Affiche l'interface de gestion des données de test"""
+    st.subheader("🎯 Gestion des Données de Test")
+    st.markdown("Générez des données de test réalistes pour tester toutes les fonctionnalités de l'application.")
+    
+    # Initialisation du générateur
+    generator = SampleDataGenerator()
+    
+    # Statut actuel des données
+    st.markdown("### 📊 Statut Actuel")
+    try:
+        db = init_database()
+        current_data = db.get_attendance_data(
+            datetime.now().date() - timedelta(days=30),
+            datetime.now().date()
+        )
+        
+        if not current_data.empty:
+            st.success(f"✅ {len(current_data)} enregistrements dans la base de données")
+            
+            # Statistiques rapides
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("Total Employés", current_data['matricule'].nunique())
+            with col2:
+                st.metric("Présents", len(current_data[current_data['statut'] == 'Présent']))
+            with col3:
+                st.metric("Absents", len(current_data[current_data['statut'] == 'Absent']))
+            with col4:
+                st.metric("Retards", len(current_data[current_data['statut'] == 'Retard']))
+        else:
+            st.info("Aucune donnée trouvée dans la base de données")
+            
+    except Exception as e:
+        st.error(f"Erreur lors de la vérification des données: {str(e)}")
+    
+    st.markdown("---")
+    
+    # Génération de nouvelles données
+    st.markdown("### 🎲 Génération de Données de Test")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        days_back = st.slider("Nombre de jours à générer", 7, 60, 30)
+        
+    with col2:
+        st.info(f"Cela créera environ {len(generator.get_employee_list()) * days_back} enregistrements")
+    
+    # Aperçu des employés
+    with st.expander("👥 Aperçu des Employés à Créer"):
+        employees = generator.get_employee_list()
+        
+        st.markdown("**Répartition par domaine:**")
+        chantre = [emp for emp in employees if emp.startswith('C')]
+        protocole = [emp for emp in employees if emp.startswith('P')]
+        regis = [emp for emp in employees if emp.startswith('R')]
+        
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.markdown(f"**Chantre:** {len(chantre)} employés")
+            st.write(", ".join(chantre[:5]) + "..." if len(chantre) > 5 else ", ".join(chantre))
+        
+        with col2:
+            st.markdown(f"**Protocole:** {len(protocole)} employés")
+            st.write(", ".join(protocole[:5]) + "..." if len(protocole) > 5 else ", ".join(protocole))
+        
+        with col3:
+            st.markdown(f"**Régis:** {len(regis)} employés")
+            st.write(", ".join(regis[:5]) + "..." if len(regis) > 5 else ", ".join(regis))
+    
+    # Boutons d'action
+    st.markdown("### 🚀 Actions")
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        if st.button("✨ Générer les Données", type="primary", use_container_width=True):
+            with st.spinner("Génération en cours..."):
+                if generator.setup_sample_data(days_back):
+                    st.balloons()
+                    st.success("Données générées avec succès!")
+                    # Effacement du cache pour voir les nouvelles données
+                    st.cache_data.clear()
+                    st.rerun()
+                else:
+                    st.error("Erreur lors de la génération des données")
+    
+    with col2:
+        if st.button("🗑️ Effacer les Données", use_container_width=True):
+            if generator.clear_data():
+                st.success("Données effacées avec succès!")
+                st.cache_data.clear()
+                st.rerun()
+            else:
+                st.error("Erreur lors de l'effacement")
+    
+    with col3:
+        if st.button("🔄 Actualiser", use_container_width=True):
+            st.cache_data.clear()
+            st.rerun()
+    
+    # Aide
+    st.markdown("---")
+    st.markdown("### 💡 Aide")
+    st.markdown("""
+    **Comment utiliser les données de test:**
+    
+    1. **Génération**: Cliquez sur "Générer les Données" pour créer des données réalistes
+    2. **Test**: Utilisez les autres onglets pour explorer les fonctionnalités
+    3. **Chatbot**: Posez des questions comme "Combien de retards chez les chantres?"
+    4. **Prédictions**: Analysez le comportement des employés
+    5. **Alertes**: Voyez les employés problématiques
+    
+    **Données générées:**
+    - 37 employés répartis dans 3 domaines
+    - Comportements réalistes avec patterns
+    - Données sur plusieurs semaines
+    - Différents types de profils d'employés
+    """)
 
 if __name__ == "__main__":
     main()
