@@ -2,11 +2,21 @@
 
 ## Overview
 
-This is a Streamlit-based dashboard application for tracking and analyzing QR code attendance statistics. The system manages employee attendance data, provides real-time analytics, and generates comprehensive reports. It's designed for organizations using QR code-based attendance tracking systems with domain-based employee classification.
+This is a comprehensive Streamlit-based dashboard application for tracking and analyzing QR code attendance statistics. The system manages employee attendance data, provides real-time analytics, generates comprehensive reports, and now includes advanced features like AI-powered chatbot assistance, predictive analytics, and automated alert systems. It's designed for organizations using QR code-based attendance tracking systems with domain-based employee classification.
 
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
+
+## Recent Changes (January 2025)
+
+### Major Feature Additions:
+- **Authentication System**: Secure login portal with default credentials (administrator/RichyMLG007)
+- **AI Chatbot Module**: Natural language query interface for attendance statistics
+- **Predictive Analytics**: Machine learning-based employee behavior prediction
+- **Alert System**: Automated notifications for excessive absences (>2) and tardiness (≥3)
+- **SMS Notifications**: Twilio integration for real-time alerts
+- **Multi-tab Interface**: Organized dashboard, chatbot, predictions, alerts, and settings
 
 ## System Architecture
 
@@ -32,9 +42,9 @@ Preferred communication style: Simple, everyday language.
 ### Core Modules
 
 1. **app.py** - Main application entry point
-   - Streamlit dashboard configuration and UI
+   - Streamlit dashboard configuration and UI with multi-tab interface
    - Data filtering and visualization logic
-   - Integration of all components
+   - Integration of all components including authentication, chatbot, predictions, and alerts
 
 2. **database.py** - Database management layer
    - PostgreSQL connection handling
@@ -50,6 +60,26 @@ Preferred communication style: Simple, everyday language.
    - PDF report creation with ReportLab
    - CSV export functionality
    - Statistical summaries and domain-based analysis
+
+5. **auth.py** - Authentication and user management
+   - Secure login system with configurable credentials
+   - User role management (admin/user)
+   - Password change and user administration features
+
+6. **chatbot.py** - AI-powered query assistant
+   - Natural language processing for attendance queries
+   - Domain-specific question understanding
+   - Contextual response generation with statistical data
+
+7. **prediction.py** - Predictive analytics module
+   - Machine learning models for behavior prediction
+   - Risk analysis and employee behavior forecasting
+   - Scikit-learn integration for attendance pattern analysis
+
+8. **alerts.py** - Automated alert system
+   - Threshold-based absence and tardiness monitoring
+   - Twilio SMS integration for real-time notifications
+   - Configurable alert rules and notification management
 
 ### Employee Classification System
 - **Domain Classification**: Automatic categorization based on matricule prefixes

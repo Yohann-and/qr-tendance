@@ -8,6 +8,10 @@ import os
 from database import DatabaseManager
 from utils import classify_domain, calculate_statistics, format_time_display
 from reports import generate_pdf_report, generate_csv_report
+from auth import AuthManager
+from chatbot import AttendanceChatbot
+from prediction import AttendancePrediction
+from alerts import AlertSystem
 
 # Configuration de la page
 st.set_page_config(
@@ -16,6 +20,18 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# Initialisation de l'authentification
+auth = AuthManager()
+
+# Initialisation des modules
+@st.cache_resource
+def init_modules():
+    return {
+        'chatbot': AttendanceChatbot(),
+        'prediction': AttendancePrediction(),
+        'alerts': AlertSystem()
+    }
 
 # Initialisation de la base de données
 @st.cache_resource
@@ -29,9 +45,43 @@ def load_data(start_date, end_date):
     return db.get_attendance_data(start_date, end_date)
 
 def main():
+    # Vérification de l'authentification
+    if not auth.is_authenticated():
+        auth.login()
+        return
+    
+    # Affichage du statut d'authentification
+    auth.show_auth_status()
+    
+    # Initialisation des modules
+    modules = init_modules()
+    
     st.title("📊 Dashboard Statistiques QR Pointage")
     st.markdown("---")
     
+    # Navigation principale
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(["📈 Tableau de Bord", "🤖 Chatbot", "🔮 Prédictions", "🚨 Alertes", "⚙️ Paramètres"])
+    
+    with tab1:
+        show_dashboard()
+    
+    with tab2:
+        show_chatbot(modules['chatbot'])
+    
+    with tab3:
+        show_predictions(modules['prediction'])
+    
+    with tab4:
+        show_alerts(modules['alerts'])
+    
+    with tab5:
+        if st.session_state.get('user_role') == 'admin':
+            show_settings()
+        else:
+            st.error("Accès refusé. Droits administrateur requis.")
+
+def show_dashboard():
+    """Affiche le tableau de bord principal"""
     # Sidebar pour les filtres
     with st.sidebar:
         st.header("🔍 Filtres")
@@ -284,6 +334,230 @@ def main():
     if auto_refresh:
         time.sleep(60)
         st.rerun()
+
+def show_chatbot(chatbot):
+    """Affiche l'interface du chatbot"""
+    st.subheader("🤖 Assistant Intelligent")
+    st.markdown("Posez vos questions sur les statistiques de pointage en langage naturel.")
+    
+    # Historique des conversations
+    if 'chat_history' not in st.session_state:
+        st.session_state.chat_history = []
+    
+    # Questions suggérées
+    st.markdown("### Questions suggérées:")
+    suggested_questions = chatbot.get_suggested_questions()
+    
+    col1, col2 = st.columns(2)
+    for i, question in enumerate(suggested_questions):
+        with col1 if i % 2 == 0 else col2:
+            if st.button(f"💬 {question}", key=f"suggested_{i}"):
+                st.session_state.chat_history.append({"type": "user", "message": question})
+                response = chatbot.process_question(question)
+                st.session_state.chat_history.append({"type": "bot", "message": response})
+                st.rerun()
+    
+    # Zone de chat
+    st.markdown("### Conversation")
+    
+    # Affichage de l'historique
+    for chat in st.session_state.chat_history:
+        if chat["type"] == "user":
+            st.markdown(f"**👤 Vous:** {chat['message']}")
+        else:
+            st.markdown(f"**🤖 Assistant:** {chat['message']}")
+    
+    # Nouvelle question
+    with st.form("chat_form"):
+        user_question = st.text_input("Posez votre question:", placeholder="Ex: Combien de retards chez les chantres aujourd'hui?")
+        submitted = st.form_submit_button("Envoyer")
+        
+        if submitted and user_question:
+            # Ajout de la question à l'historique
+            st.session_state.chat_history.append({"type": "user", "message": user_question})
+            
+            # Génération de la réponse
+            response = chatbot.process_question(user_question)
+            st.session_state.chat_history.append({"type": "bot", "message": response})
+            
+            st.rerun()
+    
+    # Bouton pour effacer l'historique
+    if st.button("🗑️ Effacer l'historique"):
+        st.session_state.chat_history = []
+        st.rerun()
+
+def show_predictions(prediction_module):
+    """Affiche l'interface des prédictions"""
+    st.subheader("🔮 Prédictions Comportementales")
+    st.markdown("Analysez les tendances et prédisez le comportement futur des employés.")
+    
+    # Sélection d'un employé
+    try:
+        # Récupération des employés actifs
+        end_date = datetime.now().date()
+        start_date = end_date - timedelta(days=30)
+        db = init_database()
+        df = db.get_attendance_data(start_date, end_date)
+        
+        if not df.empty:
+            df['domaine'] = df['matricule'].apply(classify_domain)
+            employees = sorted(df['matricule'].unique())
+            
+            selected_employee = st.selectbox("Choisir un employé:", employees)
+            
+            if selected_employee:
+                # Analyse des risques
+                st.markdown("### 📊 Analyse des Risques")
+                risk_analysis = prediction_module.get_risk_analysis(selected_employee)
+                
+                if risk_analysis:
+                    col1, col2, col3 = st.columns(3)
+                    
+                    with col1:
+                        st.metric("Taux de Présence", f"{risk_analysis['presence_rate']:.1%}")
+                    
+                    with col2:
+                        st.metric("Taux d'Absence", f"{risk_analysis['absence_rate']:.1%}")
+                    
+                    with col3:
+                        st.metric("Taux de Retard", f"{risk_analysis['late_rate']:.1%}")
+                    
+                    # Niveau de risque
+                    risk_level = risk_analysis['risk_level']
+                    if risk_level == "Élevé":
+                        st.error(f"🚨 Risque {risk_level}")
+                    elif risk_level == "Modéré":
+                        st.warning(f"⚠️ Risque {risk_level}")
+                    else:
+                        st.success(f"✅ Risque {risk_level}")
+                    
+                    # Facteurs de risque
+                    if risk_analysis['risk_factors']:
+                        st.markdown("#### Facteurs de risque identifiés:")
+                        for factor in risk_analysis['risk_factors']:
+                            st.markdown(f"• {factor}")
+                
+                # Prédictions
+                st.markdown("### 📈 Prédictions (7 prochains jours)")
+                predictions = prediction_module.predict_employee_behavior(selected_employee, 7)
+                
+                if predictions:
+                    # Graphique des prédictions
+                    chart = prediction_module.create_prediction_charts(predictions)
+                    if chart:
+                        st.plotly_chart(chart, use_container_width=True)
+                    
+                    # Tableau des prédictions
+                    pred_data = []
+                    for pred in predictions:
+                        pred_data.append({
+                            'Date': pred['date'].strftime('%d/%m/%Y'),
+                            'Prédiction': pred['prediction'],
+                            'Probabilité': f"{pred['probability']:.1%}"
+                        })
+                    
+                    pred_df = pd.DataFrame(pred_data)
+                    st.dataframe(pred_df, use_container_width=True)
+                else:
+                    st.info("Pas assez de données pour faire des prédictions fiables.")
+        else:
+            st.info("Aucune donnée disponible pour les prédictions.")
+    
+    except Exception as e:
+        st.error(f"Erreur lors du chargement des prédictions: {str(e)}")
+
+def show_alerts(alert_system):
+    """Affiche l'interface des alertes"""
+    st.subheader("🚨 Système d'Alertes")
+    st.markdown("Surveillez les employés avec des absences ou retards excessifs.")
+    
+    # Configuration des alertes
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        days_to_check = st.slider("Période d'analyse (jours)", 7, 60, 30)
+    
+    with col2:
+        auto_check = st.checkbox("Vérification automatique", value=True)
+    
+    # Récupération des alertes
+    alerts = alert_system.get_all_alerts(days_to_check)
+    
+    # Affichage du tableau de bord des alertes
+    alert_system.create_alerts_dashboard(alerts)
+    
+    # Configuration des notifications SMS
+    st.markdown("### 📱 Configuration des Notifications")
+    
+    with st.expander("Paramètres SMS"):
+        phone_numbers = st.text_area(
+            "Numéros de téléphone (un par ligne):",
+            placeholder="+33123456789\n+33987654321",
+            help="Saisissez les numéros au format international"
+        )
+        
+        if st.button("📤 Envoyer les alertes par SMS"):
+            if phone_numbers and alerts:
+                phone_list = [phone.strip() for phone in phone_numbers.split('\n') if phone.strip()]
+                alert_system.send_alert_notifications(alerts, phone_list)
+            else:
+                st.warning("Veuillez saisir au moins un numéro de téléphone et avoir des alertes disponibles.")
+    
+    # Résumé des alertes
+    if alerts:
+        st.markdown("### 📋 Résumé des Alertes")
+        summary = alert_system.get_alert_summary(alerts)
+        st.markdown(summary)
+
+def show_settings():
+    """Affiche l'interface des paramètres"""
+    st.subheader("⚙️ Paramètres Système")
+    
+    # Gestion des utilisateurs
+    auth.show_user_management()
+    
+    # Configuration de la base de données
+    with st.expander("🗄️ Configuration Base de Données"):
+        st.info("Configuration actuelle de la base de données:")
+        db = init_database()
+        success, message = db.test_connection()
+        
+        if success:
+            st.success(f"✅ {message}")
+        else:
+            st.error(f"❌ {message}")
+        
+        # Structure des tables
+        if st.button("📊 Afficher la structure des tables"):
+            table_structure = db.get_table_structure()
+            if not table_structure.empty:
+                st.dataframe(table_structure)
+            else:
+                st.info("Aucune table de pointage trouvée.")
+    
+    # Configuration des alertes
+    with st.expander("🚨 Configuration des Alertes"):
+        st.markdown("**Seuils d'alertes:**")
+        absence_threshold = st.slider("Seuil d'alertes absence", 1, 10, 2)
+        lateness_threshold = st.slider("Seuil d'alertes retard", 1, 10, 3)
+        
+        st.markdown("**Configuration Twilio:**")
+        twilio_configured = all([
+            os.getenv('TWILIO_ACCOUNT_SID'),
+            os.getenv('TWILIO_AUTH_TOKEN'),
+            os.getenv('TWILIO_PHONE_NUMBER')
+        ])
+        
+        if twilio_configured:
+            st.success("✅ Twilio configuré")
+        else:
+            st.warning("⚠️ Twilio non configuré - Les notifications SMS ne fonctionneront pas")
+    
+    # Statistiques système
+    with st.expander("📈 Statistiques Système"):
+        st.markdown("**Utilisation de l'application:**")
+        st.info("Statistiques d'utilisation à venir...")
 
 if __name__ == "__main__":
     main()
