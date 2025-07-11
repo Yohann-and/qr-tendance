@@ -1,12 +1,13 @@
 import psycopg2
 import pandas as pd
 import os
-from datetime import datetime, date
+from datetime import datetime
 import streamlit as st
 
 class DatabaseManager:
     def __init__(self):
         """Initialise la connexion à la base de données PostgreSQL"""
+        # Paramètres classiques depuis variables d'environnement (local)
         self.connection_params = {
             'host': os.getenv('PGHOST', 'localhost'),
             'port': os.getenv('PGPORT', '5432'),
@@ -15,9 +16,12 @@ class DatabaseManager:
             'password': os.getenv('PGPASSWORD', '')
         }
         
-        # Alternative avec DATABASE_URL si disponible
+        # Connexion via URL (Render)
         database_url = os.getenv('DATABASE_URL')
         if database_url:
+            # Adaptation éventuelle de l'URL si elle commence par "postgres://"
+            if database_url.startswith("postgres://"):
+                database_url = database_url.replace("postgres://", "postgresql://", 1)
             self.database_url = database_url
             self.use_url = True
         else:
@@ -72,8 +76,8 @@ class DatabaseManager:
         except psycopg2.Error as e:
             st.error(f"Erreur lors de la récupération des données: {e}")
             return pd.DataFrame()
-        except Exception as e:
-            # Fallback: tentative avec une structure de table alternative
+        except Exception:
+            # Fallback si la structure est différente
             return self.get_attendance_data_fallback(start_date, end_date)
     
     def get_attendance_data_fallback(self, start_date, end_date):
@@ -81,7 +85,6 @@ class DatabaseManager:
         Méthode de fallback avec une structure de table alternative
         """
         queries_to_try = [
-            # Structure alternative 1
             """
             SELECT 
                 employee_id as matricule,
@@ -94,8 +97,6 @@ class DatabaseManager:
             WHERE attendance_date BETWEEN %s AND %s
             ORDER BY attendance_date DESC, check_in_time DESC
             """,
-            
-            # Structure alternative 2
             """
             SELECT 
                 emp_code as matricule,
@@ -107,22 +108,6 @@ class DatabaseManager:
             FROM employee_attendance 
             WHERE punch_date BETWEEN %s AND %s
             ORDER BY punch_date DESC, punch_time DESC
-            """,
-            
-            # Structure alternative 3 - très générique
-            """
-            SELECT 
-                *
-            FROM (
-                SELECT table_name 
-                FROM information_schema.tables 
-                WHERE table_schema = 'public' 
-                AND table_type = 'BASE TABLE'
-                AND (table_name LIKE '%pointage%' 
-                     OR table_name LIKE '%attendance%'
-                     OR table_name LIKE '%presence%')
-                LIMIT 1
-            ) t
             """
         ]
         
@@ -133,7 +118,6 @@ class DatabaseManager:
                 conn.close()
                 
                 if not df.empty:
-                    # Normalisation des colonnes
                     column_mapping = {
                         'employee_id': 'matricule',
                         'emp_code': 'matricule',
@@ -144,18 +128,14 @@ class DatabaseManager:
                         'status': 'statut',
                         'attendance_status': 'statut'
                     }
-                    
                     df.rename(columns=column_mapping, inplace=True)
                     
-                    # Assurer la présence des colonnes essentielles
                     required_columns = ['matricule', 'date_pointage', 'statut']
                     if all(col in df.columns for col in required_columns):
                         return self.process_dataframe(df)
-                
             except Exception:
                 continue
         
-        # Si aucune requête ne fonctionne, retourner un DataFrame vide
         return pd.DataFrame()
     
     def process_dataframe(self, df):
@@ -165,7 +145,6 @@ class DatabaseManager:
         if df.empty:
             return df
         
-        # Conversion des types
         if 'date_pointage' in df.columns:
             df['date_pointage'] = pd.to_datetime(df['date_pointage'])
         
@@ -173,20 +152,16 @@ class DatabaseManager:
             try:
                 df['heure_pointage'] = pd.to_datetime(df['heure_pointage'], format='%H:%M:%S').dt.time
             except:
-                # Si la conversion échoue, essayer d'autres formats
                 try:
                     df['heure_pointage'] = pd.to_datetime(df['heure_pointage']).dt.time
                 except:
                     pass
         
-        # Nettoyage des données
         if 'matricule' in df.columns:
             df['matricule'] = df['matricule'].astype(str).str.upper().str.strip()
         
         if 'statut' in df.columns:
             df['statut'] = df['statut'].astype(str).str.strip()
-            
-            # Normalisation des statuts
             status_mapping = {
                 'present': 'Présent',
                 'presente': 'Présent',
@@ -200,7 +175,6 @@ class DatabaseManager:
                 'delayed': 'Retard',
                 'tardy': 'Retard'
             }
-            
             df['statut'] = df['statut'].str.lower().map(status_mapping).fillna(df['statut'])
         
         return df
