@@ -57,7 +57,23 @@ def main():
     # Initialisation des modules
     modules = init_modules()
     
-    st.title("📊 Dashboard Statistiques QR Pointage")
+    # Titre avec bouton QR
+    col1, col2 = st.columns([3, 1])
+    
+    with col1:
+        st.title("📊 Dashboard Statistiques QR Pointage")
+    
+    with col2:
+        st.markdown("### 🔗 Accès rapide")
+        if st.button("📱 Application QR", type="primary", use_container_width=True):
+            st.markdown("""
+            <script>
+            window.open('https://worker-tracker-2-0.onrender.com/attendance_log', '_blank');
+            </script>
+            """, unsafe_allow_html=True)
+        st.markdown("[🔗 Ouvrir l'app QR](https://worker-tracker-2-0.onrender.com/attendance_log)", 
+                   help="Cliquez pour accéder à l'application de scan QR")
+    
     st.markdown("---")
     
     # Navigation principale

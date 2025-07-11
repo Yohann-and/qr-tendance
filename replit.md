@@ -8,7 +8,7 @@ This is a comprehensive Streamlit-based dashboard application for tracking and a
 
 Preferred communication style: Simple, everyday language.
 
-## Recent Changes (January 2025)
+## Recent Changes (July 2025)
 
 ### Major Feature Additions:
 - **Authentication System**: Secure login portal with default credentials (administrator/RichyMLG007)
@@ -17,6 +17,13 @@ Preferred communication style: Simple, everyday language.
 - **Alert System**: Automated notifications for excessive absences (>2) and tardiness (≥3)
 - **SMS Notifications**: Twilio integration for real-time alerts
 - **Multi-tab Interface**: Organized dashboard, chatbot, predictions, alerts, and settings
+
+### Latest Updates (July 11, 2025):
+- **Company Branding**: Added "Benj Média Production" branding to login portal and PDF reports
+- **QR App Integration**: Added direct access button to main QR scanning application (https://worker-tracker-2-0.onrender.com/attendance_log)
+- **Enhanced Reports**: Integrated predictions and alerts data into PDF reports with improved recommendations
+- **Production Ready**: Removed test data functionality, application now connects to real PostgreSQL database
+- **UI Improvements**: Added company logo to login portal, improved navigation with quick access to QR app
 
 ## System Architecture
 

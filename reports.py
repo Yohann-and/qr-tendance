@@ -53,6 +53,17 @@ def generate_pdf_report(df, stats, start_date, end_date, include_predictions=Tru
     title = Paragraph("RAPPORT DE STATISTIQUES QR POINTAGE", title_style)
     elements.append(title)
     
+    # Entreprise
+    company_style = ParagraphStyle(
+        'Company',
+        parent=styles['Normal'],
+        fontSize=14,
+        spaceAfter=20,
+        alignment=TA_CENTER,
+        textColor=colors.blue
+    )
+    elements.append(Paragraph("Benj Média Production", company_style))
+    
     # Informations générales
     period_info = f"Période: {start_date.strftime('%d/%m/%Y')} au {end_date.strftime('%d/%m/%Y')}"
     generation_info = f"Généré le: {format_time_display(datetime.now())}"
