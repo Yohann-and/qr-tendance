@@ -3,7 +3,6 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime, timedelta, date
-import time
 import os
 from database import DatabaseManager
 from utils import classify_domain, calculate_statistics, format_time_display
@@ -44,6 +43,33 @@ def init_database():
 def load_data(start_date, end_date):
     db = init_database()
     return db.get_attendance_data(start_date, end_date)
+
+def show_dashboard():
+    st.header("📈 Tableau de Bord")
+    st.write("Ici, tu peux afficher les statistiques, graphiques et données importantes.")
+    # Exemple simple : afficher la date actuelle
+    st.write("Date actuelle :", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    # TODO : ajoute tes graphes et tableaux ici
+
+def show_chatbot(chatbot):
+    st.header("🤖 Chatbot")
+    st.write("Interface du chatbot ici")
+    # TODO : implémenter l'interface du chatbot
+
+def show_predictions(prediction):
+    st.header("🔮 Prédictions")
+    st.write("Affichage des prédictions ici")
+    # TODO : afficher les prédictions
+
+def show_alerts(alerts):
+    st.header("🚨 Alertes")
+    st.write("Gestion des alertes ici")
+    # TODO : afficher les alertes
+
+def show_settings():
+    st.header("⚙️ Paramètres")
+    st.write("Paramètres administrateur ici")
+    # TODO : options pour l'administrateur
 
 def main():
     # Test connexion à la base de données
@@ -101,8 +127,6 @@ def main():
             show_settings()
         else:
             st.error("Accès refusé. Droits administrateur requis.")
-
-# (Les autres fonctions show_dashboard, show_chatbot, etc restent inchangées)
 
 if __name__ == "__main__":
     main()
