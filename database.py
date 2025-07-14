@@ -1,4 +1,5 @@
 import psycopg2
+import pandas as pd
 import os
 from datetime import datetime
 
@@ -39,32 +40,39 @@ class DatabaseManager:
             date_pointage = now.date()
             heure_pointage = now.time()
 
-            conn = self.get_connection()
-            cur = conn.cursor()
-
-            cur.execute("""
-                INSERT INTO attendance (
-                    employee_id, attendance_date, check_in_time, status, created_at, updated_at
-                )
-                VALUES (%s, %s, %s, %s, %s, %s)
-            """, (matricule, date_pointage, heure_pointage, statut, now, now))
-
-            conn.commit()
-            cur.close()
-            conn.close()
-            return True, "✅ Pointage enregistré pour : " + matricule
+            with self.get_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        INSERT INTO attendance (
+                            employee_id, attendance_date, check_in_time, status, created_at, updated_at
+                        )
+                        VALUES (%s, %s, %s, %s, %s, %s)
+                    """, (matricule, date_pointage, heure_pointage, statut, now, now))
+                conn.commit()
+            return True, f"✅ Pointage enregistré pour : {matricule}"
         except Exception as e:
             return False, f"❌ Erreur insertion pointage : {e}"
+
+    def get_attendance_data(self):
+        """
+        Récupère toutes les données de la table 'attendance' sous forme de DataFrame
+        """
+        try:
+            with self.get_connection() as conn:
+                query = "SELECT * FROM attendance ORDER BY attendance_date DESC, check_in_time DESC;"
+                df = pd.read_sql(query, conn)
+            return df
+        except Exception as e:
+            print(f"❌ Erreur récupération des données : {e}")
+            return pd.DataFrame()  # retourne un DataFrame vide en cas d'erreur
 
     def test_connection(self):
         """Teste la connexion à la base"""
         try:
-            conn = self.get_connection()
-            cursor = conn.cursor()
-            cursor.execute("SELECT 1")
-            result = cursor.fetchone()
-            cursor.close()
-            conn.close()
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("SELECT 1")
+                    result = cursor.fetchone()
             return True, "✅ Connexion réussie"
         except Exception as e:
             return False, f"❌ Erreur de connexion : {e}"
