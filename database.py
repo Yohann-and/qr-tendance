@@ -5,7 +5,18 @@ from datetime import datetime
 
 class DatabaseManager:
     def __init__(self):
-        """Initialise la connexion à PostgreSQL, locale ou via Render"""
+        """Initialise la connexion PostgreSQL (Render ou locale)"""
+        
+        # ✅ Cas 1 : Render → Variable Database_url
+        self.database_url = os.getenv('Database_url')
+        self.use_url = False
+
+        if self.database_url:
+            if self.database_url.startswith("postgres://"):
+                self.database_url = self.database_url.replace("postgres://", "postgresql://", 1)
+            self.use_url = True
+
+        # ✅ Cas 2 : Connexion locale (fallback)
         self.connection_params = {
             'host': os.getenv('PGHOST', 'localhost'),
             'port': os.getenv('PGPORT', '5432'),
@@ -13,16 +24,6 @@ class DatabaseManager:
             'user': os.getenv('PGUSER', 'postgres'),
             'password': os.getenv('PGPASSWORD', '')
         }
-
-        # Si Render est configuré
-        database_url = os.getenv('DATABASE_URL')
-        if database_url:
-            if database_url.startswith("postgres://"):
-                database_url = database_url.replace("postgres://", "postgresql://", 1)
-            self.database_url = database_url
-            self.use_url = True
-        else:
-            self.use_url = False
 
     def get_connection(self):
         """Connexion fiable à PostgreSQL"""
@@ -34,9 +35,7 @@ class DatabaseManager:
             raise Exception(f"❌ Erreur de connexion PostgreSQL : {e}")
 
     def ajouter_ouvrier_et_pointage(self, matricule, nom, poste, statut="present"):
-        """
-        Ajoute un ouvrier dans 'workers' et crée son pointage dans 'attendance'
-        """
+        """Ajoute un ouvrier et son pointage dans la base"""
         matricule = matricule.strip().upper()
         nom = nom.strip().title()
         poste = poste.strip().title()
@@ -46,7 +45,7 @@ class DatabaseManager:
         try:
             with self.get_connection() as conn:
                 with conn.cursor() as cur:
-                    # Ajout ouvrier (si non existant)
+                    # Ajout ouvrier
                     cur.execute("""
                         INSERT INTO workers (matricule, nom, poste)
                         VALUES (%s, %s, %s)
@@ -70,7 +69,7 @@ class DatabaseManager:
             return False, f"❌ Erreur ajout : {e}"
 
     def insert_attendance(self, matricule, statut="present"):
-        """Insère manuellement un pointage sans ajouter l'ouvrier"""
+        """Insère un pointage sans créer l’ouvrier"""
         matricule = matricule.strip().upper()
         now = datetime.now()
 
@@ -93,9 +92,7 @@ class DatabaseManager:
             return False, f"❌ Erreur pointage : {e}"
 
     def get_attendance_data(self, date_debut=None, date_fin=None, avec_jointure=False):
-        """
-        Récupère les pointages, avec ou sans jointure avec workers
-        """
+        """Récupère les données de pointage avec ou sans jointure"""
         try:
             with self.get_connection() as conn:
                 if avec_jointure:
@@ -114,11 +111,10 @@ class DatabaseManager:
                 else:
                     base_query = "SELECT * FROM attendance"
 
+                params = ()
                 if date_debut and date_fin:
                     base_query += " WHERE attendance_date BETWEEN %s AND %s"
                     params = (date_debut, date_fin)
-                else:
-                    params = ()
 
                 base_query += " ORDER BY attendance_date DESC, check_in_time DESC"
 
@@ -132,7 +128,7 @@ class DatabaseManager:
             return pd.DataFrame()
 
     def test_connection(self):
-        """Teste simplement la connexion"""
+        """Teste la connexion PostgreSQL"""
         try:
             with self.get_connection() as conn:
                 with conn.cursor() as cur:
