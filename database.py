@@ -1,13 +1,10 @@
 import psycopg2
-import pandas as pd
 import os
 from datetime import datetime
-import streamlit as st
 
 class DatabaseManager:
     def __init__(self):
         """Initialise la connexion à la base de données PostgreSQL"""
-        # Paramètres classiques depuis variables d'environnement (local)
         self.connection_params = {
             'host': os.getenv('PGHOST', 'localhost'),
             'port': os.getenv('PGPORT', '5432'),
@@ -15,200 +12,52 @@ class DatabaseManager:
             'user': os.getenv('PGUSER', 'postgres'),
             'password': os.getenv('PGPASSWORD', '')
         }
-        
-        # Connexion via URL (Render)
+
+        # Connexion via Render (DATABASE_URL)
         database_url = os.getenv('DATABASE_URL')
         if database_url:
-            # Adaptation éventuelle de l'URL si elle commence par "postgres://"
             if database_url.startswith("postgres://"):
                 database_url = database_url.replace("postgres://", "postgresql://", 1)
             self.database_url = database_url
             self.use_url = True
         else:
             self.use_url = False
-    
+
     def get_connection(self):
         """Établit une connexion à la base de données"""
+        if self.use_url:
+            return psycopg2.connect(self.database_url)
+        else:
+            return psycopg2.connect(**self.connection_params)
+
+    def insert_attendance(self, matricule, statut="present"):
+        """
+        Insère un pointage dans la table 'attendance' pour un matricule donné.
+        """
         try:
-            if self.use_url:
-                conn = psycopg2.connect(self.database_url)
-            else:
-                conn = psycopg2.connect(**self.connection_params)
-            return conn
-        except psycopg2.Error as e:
-            st.error(f"Erreur de connexion à la base de données: {e}")
-            raise
-    
-    def get_attendance_data(self, start_date, end_date):
-        """
-        Récupère les données de pointage pour la période spécifiée
-        """
-        query = """
-        SELECT 
-            matricule,
-            date_pointage,
-            heure_pointage,
-            statut,
-            created_at,
-            updated_at
-        FROM pointages 
-        WHERE date_pointage BETWEEN %s AND %s
-        ORDER BY date_pointage DESC, heure_pointage DESC
-        """
-        
-        try:
+            now = datetime.now()
+            date_pointage = now.date()
+            heure_pointage = now.time()
+
             conn = self.get_connection()
-            df = pd.read_sql_query(query, conn, params=[start_date, end_date])
+            cur = conn.cursor()
+
+            cur.execute("""
+                INSERT INTO attendance (
+                    employee_id, attendance_date, check_in_time, status, created_at, updated_at
+                )
+                VALUES (%s, %s, %s, %s, %s, %s)
+            """, (matricule, date_pointage, heure_pointage, statut, now, now))
+
+            conn.commit()
+            cur.close()
             conn.close()
-            
-            # Conversion des types de données
-            if not df.empty:
-                df['date_pointage'] = pd.to_datetime(df['date_pointage'])
-                if 'heure_pointage' in df.columns:
-                    df['heure_pointage'] = pd.to_datetime(df['heure_pointage'], format='%H:%M:%S').dt.time
-                
-                # Nettoyage des données
-                df['matricule'] = df['matricule'].astype(str).str.upper().str.strip()
-                df['statut'] = df['statut'].str.strip()
-            
-            return df
-            
-        except psycopg2.Error as e:
-            st.error(f"Erreur lors de la récupération des données: {e}")
-            return pd.DataFrame()
-        except Exception:
-            # Fallback si la structure est différente
-            return self.get_attendance_data_fallback(start_date, end_date)
-    
-    def get_attendance_data_fallback(self, start_date, end_date):
-        """
-        Méthode de fallback avec une structure de table alternative
-        """
-        queries_to_try = [
-            """
-            SELECT 
-                employee_id as matricule,
-                attendance_date as date_pointage,
-                check_in_time as heure_pointage,
-                status as statut,
-                created_at,
-                updated_at
-            FROM attendance 
-            WHERE attendance_date BETWEEN %s AND %s
-            ORDER BY attendance_date DESC, check_in_time DESC
-            """,
-            """
-            SELECT 
-                emp_code as matricule,
-                punch_date as date_pointage,
-                punch_time as heure_pointage,
-                attendance_status as statut,
-                created_at,
-                updated_at
-            FROM employee_attendance 
-            WHERE punch_date BETWEEN %s AND %s
-            ORDER BY punch_date DESC, punch_time DESC
-            """
-        ]
-        
-        for query in queries_to_try:
-            try:
-                conn = self.get_connection()
-                df = pd.read_sql_query(query, conn, params=[start_date, end_date])
-                conn.close()
-                
-                if not df.empty:
-                    column_mapping = {
-                        'employee_id': 'matricule',
-                        'emp_code': 'matricule',
-                        'attendance_date': 'date_pointage',
-                        'punch_date': 'date_pointage',
-                        'check_in_time': 'heure_pointage',
-                        'punch_time': 'heure_pointage',
-                        'status': 'statut',
-                        'attendance_status': 'statut'
-                    }
-                    df.rename(columns=column_mapping, inplace=True)
-                    
-                    required_columns = ['matricule', 'date_pointage', 'statut']
-                    if all(col in df.columns for col in required_columns):
-                        return self.process_dataframe(df)
-            except Exception:
-                continue
-        
-        return pd.DataFrame()
-    
-    def process_dataframe(self, df):
-        """
-        Traite et nettoie le DataFrame
-        """
-        if df.empty:
-            return df
-        
-        if 'date_pointage' in df.columns:
-            df['date_pointage'] = pd.to_datetime(df['date_pointage'])
-        
-        if 'heure_pointage' in df.columns:
-            try:
-                df['heure_pointage'] = pd.to_datetime(df['heure_pointage'], format='%H:%M:%S').dt.time
-            except:
-                try:
-                    df['heure_pointage'] = pd.to_datetime(df['heure_pointage']).dt.time
-                except:
-                    pass
-        
-        if 'matricule' in df.columns:
-            df['matricule'] = df['matricule'].astype(str).str.upper().str.strip()
-        
-        if 'statut' in df.columns:
-            df['statut'] = df['statut'].astype(str).str.strip()
-            status_mapping = {
-                'present': 'Présent',
-                'presente': 'Présent',
-                'attendance': 'Présent',
-                'on_time': 'Présent',
-                'absent': 'Absent',
-                'absente': 'Absent',
-                'missing': 'Absent',
-                'late': 'Retard',
-                'retard': 'Retard',
-                'delayed': 'Retard',
-                'tardy': 'Retard'
-            }
-            df['statut'] = df['statut'].str.lower().map(status_mapping).fillna(df['statut'])
-        
-        return df
-    
-    def get_table_structure(self):
-        """
-        Récupère la structure des tables disponibles pour diagnostic
-        """
-        query = """
-        SELECT 
-            table_name,
-            column_name,
-            data_type 
-        FROM information_schema.columns 
-        WHERE table_schema = 'public'
-        AND (table_name LIKE '%pointage%' 
-             OR table_name LIKE '%attendance%'
-             OR table_name LIKE '%presence%')
-        ORDER BY table_name, ordinal_position
-        """
-        
-        try:
-            conn = self.get_connection()
-            df = pd.read_sql_query(query, conn)
-            conn.close()
-            return df
+            return True, "✅ Pointage enregistré pour : " + matricule
         except Exception as e:
-            st.error(f"Erreur lors de la récupération de la structure: {e}")
-            return pd.DataFrame()
-    
+            return False, f"❌ Erreur insertion pointage : {e}"
+
     def test_connection(self):
-        """
-        Teste la connexion à la base de données
-        """
+        """Teste la connexion à la base"""
         try:
             conn = self.get_connection()
             cursor = conn.cursor()
@@ -216,6 +65,6 @@ class DatabaseManager:
             result = cursor.fetchone()
             cursor.close()
             conn.close()
-            return True, "Connexion réussie"
+            return True, "✅ Connexion réussie"
         except Exception as e:
-            return False, str(e)
+            return False, f"❌ Erreur de connexion : {e}"
