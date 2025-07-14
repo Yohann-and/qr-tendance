@@ -53,18 +53,27 @@ class DatabaseManager:
         except Exception as e:
             return False, f"❌ Erreur insertion pointage : {e}"
 
-    def get_attendance_data(self):
+    def get_attendance_data(self, date_debut=None, date_fin=None):
         """
-        Récupère toutes les données de la table 'attendance' sous forme de DataFrame
+        Récupère les données de la table 'attendance' entre deux dates (optionnel).
+        Retourne un DataFrame pandas.
         """
         try:
             with self.get_connection() as conn:
-                query = "SELECT * FROM attendance ORDER BY attendance_date DESC, check_in_time DESC;"
-                df = pd.read_sql(query, conn)
+                if date_debut and date_fin:
+                    query = """
+                        SELECT * FROM attendance
+                        WHERE attendance_date BETWEEN %s AND %s
+                        ORDER BY attendance_date DESC, check_in_time DESC;
+                    """
+                    df = pd.read_sql(query, conn, params=(date_debut, date_fin))
+                else:
+                    query = "SELECT * FROM attendance ORDER BY attendance_date DESC, check_in_time DESC;"
+                    df = pd.read_sql(query, conn)
             return df
         except Exception as e:
             print(f"❌ Erreur récupération des données : {e}")
-            return pd.DataFrame()  # retourne un DataFrame vide en cas d'erreur
+            return pd.DataFrame()
 
     def test_connection(self):
         """Teste la connexion à la base"""
